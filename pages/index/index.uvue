@@ -1,0 +1,35 @@
+<template>
+	<scroll-view style="flex: 1;" scroll-with-animation="true" enable-to-back="true">
+		<view v-for="(item, index) in components" :key="index">
+			<button @click="navigateTo(item)">{{ item.name }}</button>
+		</view>
+	</scroll-view>
+</template>
+
+<script setup>
+	type Component = {
+		name : string,
+		url : string.PageURIString,
+	};
+
+	const components = ref([
+		{
+			name: 'tooltip',
+			url: '/pages/components/tooltip/tooltip',
+		},
+		{
+			name: 'popup',
+			url: '/pages/components/popup/popup',
+		}
+	] as Component[]);
+
+	const navigateTo = (component : Component) => {
+		uni.navigateTo({
+			url: component.url,
+		});
+	};
+</script>
+
+<style>
+
+</style>

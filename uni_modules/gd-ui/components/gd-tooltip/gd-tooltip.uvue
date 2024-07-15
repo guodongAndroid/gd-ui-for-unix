@@ -1,0 +1,239 @@
+<template>
+	<view class="gd-tooltip" :id="boxId" :ref="boxId">
+		<view @tap="togger()">
+			<slot></slot>
+		</view>
+		<view :ref="refMaskId" class="gd-tooltip-mask" :style="{ background: maskBackground, zIndex: zIndex - 2 }"
+			@tap="close()">
+		</view>
+		<view :ref="refPopupId" class="gd-tooltip-popup" :class="[`gd-tooltip-popup-pm-${placement}`]"
+			:style="getPopStyles" @tap="close()">
+			<view :style="{ padding: `${padding}px` }">
+				<text :style="{ color: color, fontSize: `${size}px` }">{{ content }}</text>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script>
+	export default {
+		name: 'gd-tooltip',
+		props: {
+			content: {
+				type: String,
+				default: '',
+				validator: (value : String) : boolean => {
+					return value.length > 0
+				}
+			},
+			maxWidth: {
+				type: Number,
+				default: 200
+			},
+			background: {
+				type: String,
+				default: '#999999'
+			},
+			radius: {
+				type: Number,
+				default: 6
+			},
+			padding: {
+				type: Number,
+				default: 8
+			},
+			color: {
+				type: String,
+				default: '#FFFFFF'
+			},
+			size: {
+				type: Number,
+				default: 14
+			},
+			maskBackground: {
+				type: String,
+				default: 'transparent'
+			},
+			// top | bottom
+			placement: {
+				type: String,
+				default: 'top',
+				validator: (value : String) : boolean => {
+					return ['top', 'bottom'].includes(value);
+				}
+			},
+			zIndex: {
+				type: Number,
+				default: 990
+			}
+		},
+		data() {
+			const boxId = `gd_tooltip_box_${parseInt(Math.ceil(Math.random() * 10e5).toString(), 36)}`
+			const refMaskId = `gd_tooltip_mask_${parseInt(Math.ceil(Math.random() * 10e5).toString(), 36)}`
+			const refPopupId = `gd_tooltip_popup_${parseInt(Math.ceil(Math.random() * 10e5).toString(), 36)}`
+			return {
+				boxId: boxId,
+				refMaskId: refMaskId,
+				refPopupId: refPopupId,
+				maskElement: null as null | UniElement,
+				popupElement: null as null | UniElement,
+				box_left: 0,
+				box_top: 0,
+				isShow: false,
+				safeAreaWidth: -1,
+			};
+		},
+		computed: {
+			getPopStyles() : string {
+				let styles = `top: ${this.box_top}px; border-radius: ${this.radius}px; background: ${this.background}; z-index: ${this.zIndex};`;
+				let maxWidth = this.maxWidth;
+				const safeAreaWidth = this.safeAreaWidth;
+				if (safeAreaWidth != -1) {
+					const popRight = this.box_left + maxWidth;
+					if (popRight >= safeAreaWidth) {
+						const diff = popRight - safeAreaWidth;
+						maxWidth = diff == 0 ? maxWidth - 5 : maxWidth - diff - 5;
+					}
+				}
+				styles += `left: ${this.box_left}px; max-width: ${maxWidth}px;`;
+				return styles;
+			}
+		},
+		mounted() {
+			this.$nextTick(() => {
+				setTimeout(() => {
+					this.getPosition((res : boolean) => {
+						if (res) { }
+					})
+				}, 50)
+			})
+		},
+		methods: {
+			getEl() {
+				if (this.popupElement == null) {
+					this.popupElement = this.$refs[this.refPopupId] as UniElement;
+				}
+
+				if (this.maskElement == null) {
+					this.maskElement = this.$refs[this.refMaskId] as UniElement;
+				}
+			},
+			getPosition(callback : (res : boolean) => void) {
+				if (this.safeAreaWidth == -1) {
+					this.safeAreaWidth = uni.getWindowInfo().safeArea.width;
+				}
+
+				uni.createSelectorQuery()
+					.in(this)
+					.select(`#${this.boxId}`)
+					.boundingClientRect()
+					.exec((ret) => {
+						const node = ret[0] as NodeInfo;
+						const height = node.height as number
+						const top = node.top as number
+						this.box_left = node.left as number;
+						this.box_top = this.placement == 'bottom' ? height + top + 5 : top - 5;
+						callback(true);
+					})
+			},
+			close() {
+				this.isShow = false;
+				this.getEl();
+				this.maskElement!.style.setProperty('opacity', '0');
+				this.popupElement!.style.setProperty('opacity', '0');
+				if (this.placement == 'top') {
+					// #ifndef APP-IOS
+					this.popupElement!.style.setProperty('transform', 'scaleY(0) translateY(-100%)');
+					// #endif
+				} else {
+					this.popupElement!.style.setProperty('transform', 'scaleY(0)');
+				}
+				setTimeout(() => {
+					this.maskElement!.style.setProperty('visibility', 'hidden');
+					this.popupElement!.style.setProperty('visibility', 'hidden');
+				}, 300);
+			},
+			show() {
+				if (this.content == '') {
+					return;
+				}
+
+				this.isShow = true;
+				this.getEl();
+				this.getPosition((res : boolean) => {
+					if (res) {
+						this.$nextTick(() => {
+							this.maskElement!.style.setProperty('opacity', '1');
+							this.maskElement!.style.setProperty('visibility', 'visible');
+							this.popupElement!.style.setProperty('opacity', '1');
+							this.popupElement!.style.setProperty('visibility', 'visible');
+							if (this.placement == 'top') {
+								// #ifndef APP-IOS
+								this.popupElement!.style.setProperty('transform', 'scaleY(1) translateY(-100%)');
+								// #endif
+							} else {
+								this.popupElement!.style.setProperty('transform', 'scaleY(1)');
+							}
+						})
+					}
+				})
+			},
+			togger() {
+				if (this.isShow) {
+					this.close();
+				} else {
+					this.show();
+				}
+			}
+		}
+	}
+</script>
+
+<style lang="scss" scoped>
+	@mixin init_hidden {
+		opacity: 0;
+		visibility: hidden;
+	}
+
+	.gd-tooltip {
+		flex: 1;
+
+		&-mask {
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			transition-duration: 0.3s;
+			transition-property: visibility, opacity;
+			@include init_hidden;
+		}
+
+		&-popup {
+			position: fixed;
+			box-sizing: border-box;
+			box-shadow: 0 0 10px rgba(2, 4, 38, 0.05);
+			transition-duration: 0.3s;
+			transition-property: opacity, transform, visibility;
+			transition-timing-function: ease-in-out;
+
+			&-pm-top {
+				@include init_hidden;
+				transform-origin: 0 100%;
+				/* #ifdef APP-IOS */
+				transform: translateY(-100%);
+				/* #endif */
+
+				/* #ifndef APP-IOS */
+				transform: scaleY(0) translateY(-100%);
+				/* #endif */
+			}
+
+			&-pm-bottom {
+				@include init_hidden;
+				transform-origin: 0 0;
+				transform: scaleY(0);
+			}
+		}
+	}
+</style>
